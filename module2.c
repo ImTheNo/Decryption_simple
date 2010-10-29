@@ -39,9 +39,9 @@ decryption_ASCII(double *crypt_freq, double *real_freq,
         real_ch[i] = (unsigned char)i;
         encrypt_ch[i] = (unsigned char)i;
     }
-    for (i = 0; i < ASCII_COUNT - 1; i++) 
+    for (i = 0; i < ASCII_COUNT - 2; i++) 
     {
-        for (j = ASCII_COUNT; j > i; j--) 
+        for (j = ASCII_COUNT - 1; j > i; j--) 
         {
             if (crypt_freq[j] < crypt_freq[j - 1]) 
             {
