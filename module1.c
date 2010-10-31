@@ -44,6 +44,7 @@ collect_stat_ASCII(FILE *fp)
     return stat;
 }
 
+
 double *
 collect_stat_UTF8(FILE *fp)
 {
@@ -53,15 +54,19 @@ collect_stat_UTF8(FILE *fp)
     long n = 0;
     iconv_t cd;
     char inbuf[2] = { -49, -67};
-    char outbuf[2] = { 0, 0};
+    char outbuf[1] = {0};
     char *pinbuf = inbuf;
     char *poutbuf = outbuf;
     size_t inbyte;
     size_t outbyte;
     inbyte = 2;
-    outbyte = 2;
-    stat = calloc(UTF8_COUNT, sizeof(double));
-    cd = iconv_open("UTF-16", "UTF-8");
+    outbyte = 1;
+    stat = calloc(ASCII_COUNT, sizeof(double));
+    if ((cd = iconv_open("KOI8-R", "UTF-8")) == NULL)
+    {
+        printf("can't change encoding");
+        return NULL;
+    }
     iconv(cd, &poutbuf, &outbyte, &poutbuf, &outbyte);
     n = 0;
     while ((ch = fgetc(fp)) != EOF) 
@@ -73,8 +78,7 @@ collect_stat_UTF8(FILE *fp)
         pinbuf = inbuf;
         poutbuf = outbuf;
         inbuf[0] = (char)ch;
-        outbyte = 2;
-        short place;
+        outbyte = 1;
         if (inbuf[0] >= 0) 
         {
             inbyte = 1;
@@ -91,13 +95,12 @@ collect_stat_UTF8(FILE *fp)
             inbyte = 2;
         }
         iconv(cd, &pinbuf, &inbyte, &poutbuf, &outbyte);
-        place = *(unsigned short *)outbuf; 
-        *(stat + place)  += 1.0;
+        *(stat + (unsigned char)*outbuf)  += 1.0;
         n++;
     } 
     if (n > 0)
     {
-        for (j = 0; j < UTF8_COUNT; j++) 
+        for (j = 0; j < ASCII_COUNT; j++) 
         {
             stat[j] /= n;
         }
@@ -110,7 +113,6 @@ collect_stat_UTF8(FILE *fp)
     iconv_close(cd);
     return stat;
 }
-
 //int main(void)
 //{
 //    double *stat;
