@@ -44,7 +44,6 @@ collect_stat_ASCII(FILE *fp)
     return stat;
 }
 
-
 double *
 collect_stat_UTF8(FILE *fp)
 {
@@ -95,6 +94,14 @@ collect_stat_UTF8(FILE *fp)
             inbyte = 2;
         }
         iconv(cd, &pinbuf, &inbyte, &poutbuf, &outbyte);
+        if (*outbuf >= 'A' && *outbuf <= 'Z') 
+        {
+            *outbuf = *outbuf - 'A' + 'a';
+        }
+        if ((unsigned char)*outbuf >= (unsigned char)'\xe0') 
+        {
+            *outbuf = (unsigned char)*outbuf - '\xe0' + '\xc0';
+        }
         *(stat + (unsigned char)*outbuf)  += 1.0;
         n++;
     } 
@@ -113,6 +120,7 @@ collect_stat_UTF8(FILE *fp)
     iconv_close(cd);
     return stat;
 }
+
 //int main(void)
 //{
 //    double *stat;
