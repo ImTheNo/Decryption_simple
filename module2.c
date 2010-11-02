@@ -28,61 +28,45 @@ swap1(double *arr, int a, int b)
     arr[a] = change;
 }
 
-int 
-decryption_ASCII(double *crypt_freq, double *real_freq, 
-           FILE *in, FILE *out, char mode)
+void
+dec1(unsigned char *real_ch, unsigned char *encrypt_ch, unsigned char *decrypt_ch, double *real_freq, double *crypt_freq)
 {
-    unsigned char real_ch[ASCII_COUNT], encrypt_ch[ASCII_COUNT], decrypt_ch[ASCII_COUNT];
-    int i, j, ch;
-    for (i = 0; i < ASCII_COUNT; i++) 
+    int i, j;
+    for (i = 0; i < ASCII_COUNT; i++)
     {
         real_ch[i] = (unsigned char)i;
         encrypt_ch[i] = (unsigned char)i;
     }
-    for (i = 0; i < ASCII_COUNT - 1; i++) 
+    for (i = 0; i < ASCII_COUNT - 1; i++)
     {
-        for (j = ASCII_COUNT - 1; j > i; j--) 
+        for (j = ASCII_COUNT - 1; j > i; j--)
         {
-            if (crypt_freq[j] < crypt_freq[j - 1]) 
+            if (crypt_freq[j] < crypt_freq[j - 1])
             {
                 swap1(crypt_freq, j, j - 1);
                 swap2(encrypt_ch, j, j - 1);
             }
-            if (real_freq[j] < real_freq[j - 1]) 
+            if (real_freq[j] < real_freq[j - 1])
             {
                 swap1(real_freq, j, j - 1);
                 swap2(real_ch, j, j - 1);
             }
         }
     }
-    for (i = 0; i < ASCII_COUNT; i++) 
+    for (i = 0; i < ASCII_COUNT; i++)
     {
         decrypt_ch[encrypt_ch[i]] = real_ch[i];
     }
-    fseek(in, 0, SEEK_SET);
-    fseek(out, 0, SEEK_SET);
-    while((ch = fgetc(in)) != EOF)
-    {
-        if (ch == '\n' || ch == 10) 
-        {
-            fputc(ch, out);
-            continue;
-        }
-        fputc(decrypt_ch[ch], out);
-    }
-    fflush(in);
-    fflush(out);
-    return 1;
 }
 
-char **
+unsigned char **
 make_dict(char *str, int dict_size)
 {
     FILE *fp;
-    char **dict;
-    char *buf;
+    unsigned char **dict;
+    unsigned char *buf;
     int i = 0;
-//    int max = 0, max_i = 0;
+// int max = 0, max_i = 0;
     int ch, j;
     if ((fp = fopen(str, "r")) == NULL)
     {
@@ -91,22 +75,22 @@ make_dict(char *str, int dict_size)
     }
 
     buf = malloc(WORD_SIZE);
-    dict = (char **)calloc(dict_size + 1, sizeof(char *));
+    dict = (unsigned char **)calloc(dict_size + 1, sizeof(char *));
 
     ch = fgetc(fp);
-    while (i < dict_size) 
+    while (i < dict_size)
     {
         j = 0;
         while (ch != EOF && !isspace(ch))
         {
-            if (ch >= 'A' && ch <= 'Z') 
+            if (ch >= 'A' && ch <= 'Z')
             {
                 ch = ch - 'A' + 'a';
             }
             buf[j++] = ch;
             ch = fgetc(fp);
         }
-        while (ch != '\n') 
+        while (ch != '\n')
         {
             ch = fgetc(fp);
         }
@@ -119,13 +103,13 @@ make_dict(char *str, int dict_size)
         }
         strcpy(dict[i++], buf);
 
-//        if (strlen(buf) > max) 
-//        {
-//            max = strlen(buf);
-//            max_i = i;
-//        }
+// if (strlen(buf) > max)
+// {
+// max = strlen(buf);
+// max_i = i;
+// }
 
-        if (ch == EOF) 
+        if (ch == EOF)
         {
             break;
         }
@@ -133,8 +117,204 @@ make_dict(char *str, int dict_size)
     dict[i] = NULL;
     fclose(fp);
     free(buf);
-//    printf("%d %d\n", max, max_i);
+// printf("%d %d\n", max, max_i);
     return dict;
+}
+
+void
+sort(p_eq cur, int a1, int a2)
+{
+    char *word;
+    int er = 0;
+    int i;
+    if (cur != NULL)
+    {
+        char a1_ch;
+        if (a1 > a2) 
+        {
+            if (cur->next == NULL) 
+            {
+                sort(NULL, 0, 0);
+            }
+            else
+            {
+                sort(cur->next, cur->next->b, cur->next->e);
+            }
+            return;
+        }
+        for (i = a1; i > cur->b; i--) 
+        {
+            sort(cur, a1 + 1, a2);
+            swap2(encrypt_ch, i, i - 1);
+        }
+        sort(cur, a1 + 1, a2);
+        a1_ch = encrypt_ch[cur->b];
+        for ( i = cur->b; i < a1; i++) 
+        {
+            encrypt_ch[i] = encrypt_ch[i + 1];
+        }
+        encrypt_ch[a1] = a1_ch;
+        return;
+    }
+    for (i = 0; i < ASCII_COUNT; i++) 
+    {
+        dec_perm_ch[encrypt_ch[i]] = real_ch[i]; 
+    }
+    for (i = 0; i < strlen(perm_buff); i++) 
+    {
+        perm_dec_buff[i] = dec_perm_ch[perm_buff[i]];
+    }
+    word = strtok(perm_dec_buff, delim);
+    while (word != NULL) 
+    {
+        int a = 0, b = dict_size - 1;
+        while (a < b - 1) 
+        {
+            int h = (a + b) / 2;
+            if (strcmp(word, dict[h]) > 0) 
+            {
+                a = h + 1;
+            }
+            else 
+            {
+                b = h;
+            }
+        }
+        if (strcmp(dict[a], word) != 0 && strcmp(dict[b], word) != 0) 
+        {
+            er++;
+        }
+        word = strtok(NULL, delim);
+    }
+    if (er < min_er) 
+    {
+        min_er = er;
+        for (er = 0; er < ASCII_COUNT; er++) 
+        {
+            decrypt_ch[er] = dec_perm_ch[er];
+        }
+    }
+}
+
+void
+dictionary_analyse(unsigned char *real_ch, unsigned char *encrypt_ch, unsigned char *decrypt_ch, double *real_freq, double *crypt_freq,
+                   FILE *in, iconv_t *cd)
+{
+    int ch, i = 0, fl = 0;
+    p_eq equals;
+    p_eq real_equals = NULL;
+    p_eq last_eq;
+
+    real_equals = create_elem(0, 0, real_equals);
+    last_eq = equals = real_equals;
+    while (i < ASCII_COUNT - 1 && crypt_freq[i] < D_ZERO)   //Making list of symbols whose frequentces are almost equivalent.
+    {
+        i++;
+    }
+    while (i < ASCII_COUNT - 1)
+    {
+        if (fl)
+        {
+            if (crypt_freq[i + 1] - crypt_freq[last_eq->b] > MAGIC)
+            {
+                fl = 0;
+                last_eq->e = i;
+            }
+        }
+        else
+        {
+            if (crypt_freq[i + 1] - crypt_freq[i] < MAGIC)
+            {
+                fl = 1;
+                last_eq->next = create_elem(i, i, last_eq->next);
+                last_eq = last_eq->next;
+            }
+        }
+        i++;
+    }
+
+    if (fl)
+    {
+        last_eq->e = i;
+    }
+    equals = equals->next;
+    while (equals != NULL) //deleting non alphabet symbols from list.
+    {
+        if (equals->b == equals->e) 
+        {
+            equals = equals->next;
+            continue;
+        }
+        if (encrypt_ch[equals->b] >= 'a' && encrypt_ch[equals->b] <= 'z') 
+        {
+            break;
+        }
+        equals->b++;
+    }
+
+    fseek(in, 0, SEEK_SET);
+    i = 0;
+    if (cd == NULL)     
+    {
+        while((ch = fgetc(in)) != EOF && i < BUFF_SIZE - 1) // reading test sequence of symbols in buffer
+        {
+            if (ch >= 'A' && ch <= 'Z')
+            {
+                ch = ch - 'A' + 'a';
+            }
+            perm_buff[i++] = (unsigned char)ch;
+        }
+    }
+    else
+    {
+         
+    }
+    perm_buff[i] = '\0';
+    if (equals != NULL)
+    {
+        sort(equals, equals->b, equals->e); //step2: dictionary analyse
+    }
+    free_elems(real_equals);
+}
+
+double *
+collect_stat_ASCII(FILE *fp)
+{
+    double *stat;
+    int ch;
+    int j = 0;
+    long n;
+    stat = calloc(ASCII_COUNT, sizeof(double));
+    n = 0;
+    while ((ch = fgetc(fp)) != EOF)
+    {
+        if ((isspace(ch) && ch != ' ') || ch == '\x0a')
+        {
+            continue;
+        }
+        if (ch >= 'A' && ch <= 'Z')
+        {
+            ch = ch - 'A' + 'a';
+        }
+        stat[ch] += 1.0;
+        n++;
+    }
+    if (n > 0)
+    {
+        for (j = 0; j < ASCII_COUNT; j++)
+        {
+            stat[j] /= n;
+        }
+    }
+    else
+    {
+        return NULL;
+    }
+//    for (j = 0; j < ASCII_COUNT; j++)
+//    {
+//        printf("%4d %c %lf\n", j, j, stat[j]);
+//    }
+    return stat;
 }
 
 int 
