@@ -1,23 +1,24 @@
- 
-#include	<iconv.h>
-#include	<stdlib.h>
-#include	<string.h>
-#include	<stdio.h>
-#include	<ctype.h>
+#include <iconv.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <ctype.h>
 
-#define     MAGIC   1e-2
-#define     D_ZERO  1e-6
-enum CONSTANTS 
+#define MAGIC 1e-2
+#define D_ZERO 1e-5
+
+
+enum CONSTANTS
 {
     UTF_COUNT = 65535,
-    ASCII_COUNT = 256, 
-    BUFF_SIZE = 100,
+    ASCII_COUNT = 256,
+    BUFF_SIZE = 101,
     FREQ_EL = 256,
     DICT_SIZE = 74550,
-    WORD_SIZE = 54
+    WORD_SIZE = 54,
 };
 
-struct eques 
+struct eques
 {
     int b;
     int e;
@@ -26,10 +27,18 @@ struct eques
 
 typedef struct eques *p_eq;
 
+char delim[] = { ' ' };
+unsigned char real_ch[ASCII_COUNT], encrypt_ch[ASCII_COUNT], decrypt_ch[ASCII_COUNT], dec_perm_ch[ASCII_COUNT];
+unsigned char perm_buff[BUFF_SIZE], perm_dec_buff[BUFF_SIZE];
+int min_er = BUFF_SIZE;
+unsigned char **dict;
+int dict_size;
+
+
 p_eq
 create_elem(int b, int e, p_eq cur)
 {
-    if (cur == NULL) 
+    if (cur == NULL)
     {
         cur = (p_eq)calloc(1, sizeof(struct eques));
         cur->b = b;
@@ -46,7 +55,7 @@ create_elem(int b, int e, p_eq cur)
 void
 free_elems(p_eq cur)
 {
-    if (cur == NULL) 
+    if (cur == NULL)
     {
         return;
     }
@@ -54,7 +63,7 @@ free_elems(p_eq cur)
     free(cur);
 }
 
-void 
+void
 swap2(unsigned char *arr, int a, int b)
 {
     unsigned char change = arr[b];
@@ -62,7 +71,7 @@ swap2(unsigned char *arr, int a, int b)
     arr[a] = change;
 }
 
-void 
+void
 swap1(double *arr, int a, int b)
 {
     double change = arr[b];
@@ -70,42 +79,116 @@ swap1(double *arr, int a, int b)
     arr[a] = change;
 }
 
-void 
+void
 dec1(unsigned char *real_ch, unsigned char *encrypt_ch, unsigned char *decrypt_ch, double *real_freq, double *crypt_freq)
 {
     int i, j;
-    for (i = 0; i < ASCII_COUNT; i++) 
+    for (i = 0; i < ASCII_COUNT; i++)
     {
         real_ch[i] = (unsigned char)i;
         encrypt_ch[i] = (unsigned char)i;
     }
-    for (i = 0; i < ASCII_COUNT - 1; i++) 
+    for (i = 0; i < ASCII_COUNT - 1; i++)
     {
-        for (j = ASCII_COUNT - 1; j > i; j--) 
+        for (j = ASCII_COUNT - 1; j > i; j--)
         {
-            if (crypt_freq[j] < crypt_freq[j - 1]) 
+            if (crypt_freq[j] < crypt_freq[j - 1])
             {
                 swap1(crypt_freq, j, j - 1);
                 swap2(encrypt_ch, j, j - 1);
             }
-            if (real_freq[j] < real_freq[j - 1]) 
+            if (real_freq[j] < real_freq[j - 1])
             {
                 swap1(real_freq, j, j - 1);
                 swap2(real_ch, j, j - 1);
             }
         }
     }
-    for (i = 0; i < ASCII_COUNT; i++) 
+    for (i = 0; i < ASCII_COUNT; i++)
     {
         decrypt_ch[encrypt_ch[i]] = real_ch[i];
     }
 }
 
-int 
-decryption_ASCII(double *crypt_freq, double *real_freq, 
+void
+sort(p_eq cur, int a1, int a2)
+{
+    char *word;
+    int er = 0;
+    int i;
+    if (cur != NULL)
+    {
+        char a1_ch;
+        if (a1 > a2) 
+        {
+            if (cur->next == NULL) 
+            {
+                sort(NULL, 0, 0);
+            }
+            else
+            {
+                sort(cur->next, cur->next->b, cur->next->e);
+            }
+            return;
+        }
+        for (i = a1; i > cur->b; i--) 
+        {
+            sort(cur, a1 + 1, a2);
+            swap2(encrypt_ch, i, i - 1);
+        }
+        sort(cur, a1 + 1, a2);
+        a1_ch = encrypt_ch[cur->b];
+        for ( i = cur->b; i < a1; i++) 
+        {
+            encrypt_ch[i] = encrypt_ch[i + 1];
+        }
+        encrypt_ch[a1] = a1_ch;
+        return;
+    }
+    for (i = 0; i < ASCII_COUNT; i++) 
+    {
+        dec_perm_ch[encrypt_ch[i]] = real_ch[i]; 
+    }
+    for (i = 0; i < strlen(perm_buff); i++) 
+    {
+        perm_dec_buff[i] = dec_perm_ch[perm_buff[i]];
+    }
+    word = strtok(perm_dec_buff, delim);
+    while (word != NULL) 
+    {
+        int a = 0, b = dict_size - 1;
+        while (a < b - 1) 
+        {
+            int h = (a + b) / 2;
+            if (strcmp(word, dict[h]) > 0) 
+            {
+                a = h + 1;
+            }
+            else 
+            {
+                b = h;
+            }
+        }
+        if (strcmp(dict[a], word) != 0 && strcmp(dict[b], word) != 0) 
+        {
+            er++;
+        }
+        word = strtok(NULL, delim);
+    }
+    if (er < min_er) 
+    {
+        min_er = er;
+        for (er = 0; er < ASCII_COUNT; er++) 
+        {
+            decrypt_ch[er] = dec_perm_ch[er];
+        }
+    }
+}
+
+int
+decryption_ASCII(double *crypt_freq, double *real_freq,
            FILE *in, FILE *out, char mode)
 {
-    unsigned char real_ch[ASCII_COUNT], encrypt_ch[ASCII_COUNT], decrypt_ch[ASCII_COUNT];
     int ch, i = 0, fl = 0;
     p_eq equals;
     p_eq real_equals = NULL;
@@ -115,13 +198,13 @@ decryption_ASCII(double *crypt_freq, double *real_freq,
     
     real_equals = create_elem(0, 0, real_equals);
     last_eq = equals = real_equals;
-    while (i < ASCII_COUNT - 1 && crypt_freq[i] < D_ZERO) 
+    while (i < ASCII_COUNT - 1 && crypt_freq[i] < D_ZERO)
     {
         i++;
     }
-    while (i < ASCII_COUNT - 1) 
+    while (i < ASCII_COUNT - 1)
     {
-        if (fl) 
+        if (fl)
         {
             if (crypt_freq[i + 1] - crypt_freq[last_eq->b] > MAGIC)
             {
@@ -131,7 +214,7 @@ decryption_ASCII(double *crypt_freq, double *real_freq,
         }
         else
         {
-            if (crypt_freq[i + 1] - crypt_freq[i] < MAGIC) 
+            if (crypt_freq[i + 1] - crypt_freq[i] < MAGIC)
             {
                 fl = 1;
                 last_eq->next = create_elem(i, i, last_eq->next);
@@ -141,23 +224,56 @@ decryption_ASCII(double *crypt_freq, double *real_freq,
         i++;
     }
 
-    if (fl) 
+    if (fl)
     {
         last_eq->e = i;
     }
     equals = equals->next;
+    while (equals != NULL) 
+    {
+        if (equals->b == equals->e) 
+        {
+            equals = equals->next;
+            continue;
+        }
+        if (encrypt_ch[equals->b] >= 'a' && encrypt_ch[equals->b] <= 'z') 
+        {
+            break;
+        }
+        equals->b++;
+    }
 
+    fseek(in, 0, SEEK_SET);
+    i = 0;
+    while((ch = fgetc(in)) != EOF && i < BUFF_SIZE - 1)
+    {
+        if ((isspace(ch) && ch != ' ') || ch == '\x0a')
+        {
+            fputc(ch, out);
+            continue;
+        }
+        if (ch >= 'A' && ch <= 'Z')
+        {
+            ch = ch - 'A' + 'a';
+        }
+        perm_buff[i++] = (unsigned char)ch;
+    }
+    perm_buff[i] = '\0';
+    if (equals != NULL)
+    {
+        sort(equals, equals->b, equals->e);
+    }
 
     fseek(in, 0, SEEK_SET);
     fseek(out, 0, SEEK_SET);
     while((ch = fgetc(in)) != EOF)
     {
-        if (ch == '\n' || ch == '\x0a')
+        if ((isspace(ch) && ch != ' ') || ch == '\x0a')
         {
             fputc(ch, out);
             continue;
         }
-        if (ch >= 'A' && ch <= 'Z') 
+        if (ch >= 'A' && ch <= 'Z')
         {
             ch = ch - 'A' + 'a';
         }
@@ -169,8 +285,8 @@ decryption_ASCII(double *crypt_freq, double *real_freq,
     return 1;
 }
 
-int 
-decryption_UTF8(double *crypt_freq, double *real_freq, 
+int
+decryption_UTF8(double *crypt_freq, double *real_freq,
            FILE *in, FILE *out, char mode)
 {
     unsigned char real_ch[ASCII_COUNT], encrypt_ch[ASCII_COUNT], decrypt_ch[ASCII_COUNT];
@@ -208,7 +324,7 @@ decryption_UTF8(double *crypt_freq, double *real_freq,
     fseek(out, 0, SEEK_SET);
     while((ch = fgetc(in)) != EOF)
     {
-        if (ch == '\n' || ch == '\x0a')
+        if ((isspace(ch) && ch != ' ') || ch == '\x0a')
         {
             fputc(ch, out);
             continue;
@@ -217,12 +333,12 @@ decryption_UTF8(double *crypt_freq, double *real_freq,
         poutbuf = outbuf;
         inbuf[0] = (char)ch;
         outbyte = 1;
-        if (inbuf[0] >= 0) 
+        if (inbuf[0] >= 0)
         {
             inbyte = 1;
         }
-        else 
-        { 
+        else
+        {
             if ((ch = fgetc(in)) == EOF)
             {
                 printf("not good realization of UTF8");
@@ -234,11 +350,11 @@ decryption_UTF8(double *crypt_freq, double *real_freq,
             inbyte = 2;
         }
         iconv(cd, &pinbuf, &inbyte, &poutbuf, &outbyte);
-        if (*outbuf >= 'A' && *outbuf <= 'Z') 
+        if (*outbuf >= 'A' && *outbuf <= 'Z')
         {
             *outbuf = *outbuf - 'A' + 'a';
         }
-        if ((unsigned char)*outbuf >= (unsigned char)'\xe0') 
+        if ((unsigned char)*outbuf >= (unsigned char)'\xe0')
         {
             *outbuf = (unsigned char)*outbuf - '\xe0' + '\xc0';
         }
@@ -247,7 +363,7 @@ decryption_UTF8(double *crypt_freq, double *real_freq,
         poutbuf = inbuf;
         pinbuf = outbuf;
         outbyte = sym_size = 2;
-        if (*outbuf >= 0) 
+        if (*outbuf >= 0)
         {
             outbyte = sym_size = 1;
         }
@@ -270,22 +386,22 @@ collect_stat_ASCII(FILE *fp)
     long n;
     stat = calloc(ASCII_COUNT, sizeof(double));
     n = 0;
-    while ((ch = fgetc(fp)) != EOF) 
+    while ((ch = fgetc(fp)) != EOF)
     {
-        if (ch == '\n' || ch == '\x0a')
+        if ((isspace(ch) && ch != ' ') || ch == '\x0a')
         {
             continue;
         }
-        if (ch >= 'A' && ch <= 'Z') 
+        if (ch >= 'A' && ch <= 'Z')
         {
             ch = ch - 'A' + 'a';
         }
         stat[ch] += 1.0;
         n++;
-    } 
+    }
     if (n > 0)
     {
-        for (j = 0; j < ASCII_COUNT; j++) 
+        for (j = 0; j < ASCII_COUNT; j++)
         {
             stat[j] /= n;
         }
@@ -294,21 +410,21 @@ collect_stat_ASCII(FILE *fp)
     {
         return NULL;
     }
-    for (j = 0; j < ASCII_COUNT; j++) 
-    {
-        printf("%4d %c %lf\n", j, j, stat[j]);
-    }
+//    for (j = 0; j < ASCII_COUNT; j++)
+//    {
+//        printf("%4d %c %lf\n", j, j, stat[j]);
+//    }
     return stat;
-} 
+}
 
-char **
+unsigned char **
 make_dict(char *str, int dict_size)
 {
     FILE *fp;
-    char **dict;
-    char *buf;
+    unsigned char **dict;
+    unsigned char *buf;
     int i = 0;
-//    int max = 0, max_i = 0;
+// int max = 0, max_i = 0;
     int ch, j;
     if ((fp = fopen(str, "r")) == NULL)
     {
@@ -317,22 +433,22 @@ make_dict(char *str, int dict_size)
     }
 
     buf = malloc(WORD_SIZE);
-    dict = (char **)calloc(dict_size + 1, sizeof(char *));
+    dict = (unsigned char **)calloc(dict_size + 1, sizeof(char *));
 
     ch = fgetc(fp);
-    while (i < dict_size) 
+    while (i < dict_size)
     {
         j = 0;
         while (ch != EOF && !isspace(ch))
         {
-            if (ch >= 'A' && ch <= 'Z') 
+            if (ch >= 'A' && ch <= 'Z')
             {
                 ch = ch - 'A' + 'a';
             }
             buf[j++] = ch;
             ch = fgetc(fp);
         }
-        while (ch != '\n') 
+        while (ch != '\n')
         {
             ch = fgetc(fp);
         }
@@ -345,13 +461,13 @@ make_dict(char *str, int dict_size)
         }
         strcpy(dict[i++], buf);
 
-//        if (strlen(buf) > max) 
-//        {
-//            max = strlen(buf);
-//            max_i = i;
-//        }
+// if (strlen(buf) > max)
+// {
+// max = strlen(buf);
+// max_i = i;
+// }
 
-        if (ch == EOF) 
+        if (ch == EOF)
         {
             break;
         }
@@ -359,7 +475,7 @@ make_dict(char *str, int dict_size)
     dict[i] = NULL;
     fclose(fp);
     free(buf);
-//    printf("%d %d\n", max, max_i);
+// printf("%d %d\n", max, max_i);
     return dict;
 }
 
@@ -387,9 +503,9 @@ collect_stat_UTF8(FILE *fp)
     }
     iconv(cd, &poutbuf, &outbyte, &poutbuf, &outbyte);
     n = 0;
-    while ((ch = fgetc(fp)) != EOF) 
+    while ((ch = fgetc(fp)) != EOF)
     {
-        if (ch == '\n' || ch == '\x0a')
+        if ((isspace(ch) && ch != ' ') || ch == '\x0a')
         {
             continue;
         }
@@ -397,12 +513,12 @@ collect_stat_UTF8(FILE *fp)
         poutbuf = outbuf;
         inbuf[0] = (char)ch;
         outbyte = 1;
-        if (inbuf[0] >= 0) 
+        if (inbuf[0] >= 0)
         {
             inbyte = 1;
         }
-        else 
-        { 
+        else
+        {
             if ((ch = fgetc(fp)) == EOF)
             {
                 printf("not good realization of UTF8");
@@ -413,20 +529,20 @@ collect_stat_UTF8(FILE *fp)
             inbyte = 2;
         }
         iconv(cd, &pinbuf, &inbyte, &poutbuf, &outbyte);
-        if (*outbuf >= 'A' && *outbuf <= 'Z') 
+        if (*outbuf >= 'A' && *outbuf <= 'Z')
         {
             *outbuf = *outbuf - 'A' + 'a';
         }
-        if ((unsigned char)*outbuf >= (unsigned char)'\xe0') 
+        if ((unsigned char)*outbuf >= (unsigned char)'\xe0')
         {
             *outbuf = (unsigned char)*outbuf - '\xe0' + '\xc0';
         }
-        *(stat + (unsigned char)*outbuf)  += 1.0;
+        *(stat + (unsigned char)*outbuf) += 1.0;
         n++;
-    } 
+    }
     if (n > 0)
     {
-        for (j = 0; j < ASCII_COUNT; j++) 
+        for (j = 0; j < ASCII_COUNT; j++)
         {
             stat[j] /= n;
         }
@@ -446,21 +562,20 @@ main(int argc, char *argv[])
     FILE *fp1, *fp2, *fp3;
     int j;
     double *stat_r, *stat_en;
-    char **dict;
     fp1 = fopen("dict.txt", "rb");
     fp2 = fopen("out.txt", "w");
-    if (!(stat_r = collect_stat_ASCII(fp1))) 
+    if (!(stat_r = collect_stat_ASCII(fp1)))
     {
         printf("bad in begin of collect_stat");
         return 0;
     }
-    for (j = 0; j < ASCII_COUNT; j++) 
-    {
-        printf("%4d %lf\n", j, stat_r[j]);
-    }
+//    for (j = 0; j < ASCII_COUNT; j++)
+//    {
+//        printf("%4d %lf\n", j, stat_r[j]);
+//    }
     fclose(fp1);
     fp3 = fopen("in.txt", "rb");
-    if (!(stat_en = collect_stat_ASCII(fp3))) 
+    if (!(stat_en = collect_stat_ASCII(fp3)))
     {
         printf("bad in begin of collect_stat");
         return 0;
@@ -468,8 +583,11 @@ main(int argc, char *argv[])
     fclose(fp3);
     fp3 = fopen("in.txt", "rb");
     dict = make_dict("dict_en.txt", DICT_SIZE);
-//    scanf("%s\n", dict[0]);
+    dict_size = DICT_SIZE;
+// scanf("%s\n", dict[0]);
+
     decryption_ASCII(stat_en, stat_r, fp3, fp2, 0);
+
     fclose(fp2);
     fclose(fp3);
     free(stat_r);
