@@ -1,0 +1,9 @@
+to compile run "make" and then "make clean"
+
+to run use command s_2_tt with following args:
+-l languege of text
+-e encoding of text
+-i input file
+-d dictionary file
+-o output file
+-u type it if you want run user interface ( don't type if you want to work in automatic mode)
