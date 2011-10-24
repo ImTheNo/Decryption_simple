@@ -1,9 +1,15 @@
 to compile run "make" and then "make clean"
 
 to run use command s_2_tt with following args:
--l languege of text
--e encoding of text
--i input file
--d dictionary file
--o output file
--u type it if you want run user interface ( don't type if you want to work in automatic mode)
+-i input file this option is necessary
+-o output file you may omit this option than stdout will be used
+
+than in program type in one line list of files which you want program to use
+as data for statistic calculation(frequencies of symbols in english languege). 
+separate files with spaces. please, do not use spaces inside filenames, 
+double quotes alsa aren't supprorted.
+
+Please note, this program works only with ASCII encoding and english languege.
+It is not support interactive mode.
+It is NOT work properly on real texts encrypted with replacement chiphers.
+
